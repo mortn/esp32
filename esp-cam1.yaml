@@ -1,0 +1,102 @@
+esphome:
+  name: esp-camera
+
+esp32:
+  board: esp32cam
+  framework:
+    type: arduino
+  
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  # password: !secret api_password
+  encryption:
+    key: !secret api_key
+
+ota:
+  password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_iot_ssid
+  password: !secret wifi_iot_password
+  use_address: 172.xxx.xxx.xxx
+          
+# Example configuration entry
+esp32_camera:
+  name: My Camera
+  external_clock:
+    pin: GPIO0
+    frequency: 20MHz
+  i2c_pins:
+    sda: GPIO26
+    scl: GPIO27
+  data_pins: [GPIO5, GPIO18, GPIO19, GPIO21, GPIO36, GPIO39, GPIO34, GPIO35]
+  vsync_pin: GPIO25
+  href_pin: GPIO23
+  pixel_clock_pin: GPIO22
+  power_down_pin: GPIO32
+
+esp32_camera_web_server:
+  - port: 8080
+    mode: stream
+#  - port: 8081
+#    mode: snapshot
+
+text_sensor:
+  - platform: template
+    name: Esp Camera Uptime
+    id: uptime_human
+    icon: mdi:clock-start
+
+time:
+  - platform: sntp
+    id: sntp_time
+    servers: 172.xxx.xxx.xxx
+    on_time:
+      - seconds: 0
+        minutes: 0
+        hours: 12
+        days_of_week: MON-SUN
+        then:
+          - button.press: restart_esp
+    
+button:
+  - platform: restart
+    name: "Esp Camera Restart"
+    id: restart_esp
+  - platform: shutdown
+    name: "Esp Camera Shutdown"
+
+# Example configuration entry
+binary_sensor:
+  - platform: status
+    name: "Esp Camera Status"
+
+sensor:
+  - platform: uptime
+    name: "Esp Camera - Uptime Sensor"
+    id: uptime_sensor
+    update_interval: 60s
+    on_raw_value:
+      then:
+        - text_sensor.template.publish:
+            id: uptime_human
+            state: !lambda |-
+              int seconds = round(id(uptime_sensor).raw_state);
+              int days = seconds / (24 * 3600);
+              seconds = seconds % (24 * 3600);
+              int hours = seconds / 3600;
+              seconds = seconds % 3600;
+              int minutes = seconds /  60;
+              seconds = seconds % 60;
+              return (
+                (days ? to_string(days) + "d " : "") +
+                (hours ? to_string(hours) + "h " : "") +
+                (minutes ? to_string(minutes) + "m " : "") +
+                (to_string(seconds) + "s")
+              ).c_str();
+  - platform: wifi_signal
+    name: "Esp Camera - WiFi Signal"
+    update_interval: 60s
